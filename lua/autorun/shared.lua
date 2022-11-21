@@ -146,7 +146,6 @@ hook.Add( "Initialize", "ReplaceMeleeBehaviourModuleForVJL4D2", function()
                     local bHit = false
                     local hitCount = 0 
                     local dmgInfo = DamageInfo() 
-                    print(dmgInfo)
                     local sound = ""
                     
                     -- Modified from SWEP:MeleeCode() in VJ Base
