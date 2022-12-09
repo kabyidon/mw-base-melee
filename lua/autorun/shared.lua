@@ -120,7 +120,8 @@ hook.Add( "Initialize", "ReplaceMeleeBehaviourModuleForVJL4D2", function()
 
         -- Refactored code to "shove" L4D2 NPCs 
 
-        if ((self:GetOwner():KeyDown(IN_USE) || self.Melee) && self:GetOwner():KeyPressed(IN_ATTACK) || self:GetOwner():KeyPressed(IN_ALT1)) then 
+        -- All this stuff needs to be run on the Client/shared
+        if (((self:GetOwner():KeyDown(IN_USE) || self.Melee) && self:GetOwner():KeyPressed(IN_ATTACK)) || self:GetOwner():KeyPressed(IN_ALT1)) then 
             self:SetSafety(false)
             if (self:CanMelee()) then
                 if (CurTime() > self:GetNextMeleeTime()) then
@@ -147,45 +148,48 @@ hook.Add( "Initialize", "ReplaceMeleeBehaviourModuleForVJL4D2", function()
                     local hitCount = 0 
                     local dmgInfo = DamageInfo() 
                     local sound = ""
-                    
-                    -- Modified from SWEP:MeleeCode() in VJ Base
-                    for _,v in pairs(ents.FindInSphere(self:GetOwner():GetShootPos(), meleeRange)) do
-                        if v:IsNPC() && self:GetOwner():Visible(v) && v != self && v != owner then
-                            dmgInfo = DamageInfo() 
-                            dmgInfo:SetInflictor(self)
-                            dmgInfo:SetAttacker(self:GetOwner())
-                            dmgInfo:SetDamage(self.Animations["Melee_Hit"].Damage)
-                            dmgInfo:SetDamagePosition(GetNearestPoint(self, v).MyPosition)
-                            dmgInfo:SetDamageForce(self:GetOwner():EyeAngles():Forward() * (self.Animations["Melee_Hit"].Damage * (meleeRange)))
-                            dmgInfo:SetDamageType(DMG_CLUB + DMG_ALWAYSGIB)
-                            local inCone = (self:GetOwner():GetAimVector():Angle():Forward():Dot(((v:GetPos() +v:OBBCenter()) - self:GetOwner():GetShootPos()):GetNormalized()) > math.cos(math.rad((meleeRange))))
-                            if inCone then
-                                if (v.VJ_L4D2_SpecialInfected or v.Shove_Forward or v.Zombie_CanPuke != nil) && !v.VJ_NoFlinch && v:Health() > 0 then
-                                    dmgInfo:SetDamage(self.Animations["Melee_Hit"].Damage * 0.5)
-                                    bHitNPC = true
-                                    bHit = true
-                                    Flinch(self,v)
-                                end 
-                                if hitCount < 3 then
-                                    hitCount = hitCount + 1 
+                    -- This needs to be in server
+                    if SERVER then
+                        -- Modified from SWEP:MeleeCode() in VJ Base
+                        for _,v in pairs(ents.FindInSphere(self:GetOwner():GetShootPos(), meleeRange)) do
+                            if v:IsNPC() && v != self && v != owner then
+                                dmgInfo = DamageInfo() 
+                                dmgInfo:SetInflictor(self)
+                                dmgInfo:SetAttacker(self:GetOwner())
+                                dmgInfo:SetDamage(self.Animations["Melee_Hit"].Damage)
+                                dmgInfo:SetDamagePosition(GetNearestPoint(self, v).MyPosition)
+                                dmgInfo:SetDamageForce(self:GetOwner():EyeAngles():Forward() * (self.Animations["Melee_Hit"].Damage * (meleeRange)))
+                                dmgInfo:SetDamageType(DMG_CLUB + DMG_ALWAYSGIB)
+                                local inCone = (self:GetOwner():GetAimVector():Angle():Forward():Dot(((v:GetPos() +v:OBBCenter()) - self:GetOwner():GetShootPos()):GetNormalized()) > math.cos(math.rad((meleeRange))))
+                                if inCone then
+                                    if (v.VJ_L4D2_SpecialInfected or v.Shove_Forward or v.Zombie_CanPuke != nil) && !v.VJ_NoFlinch && v:Health() > 0 then
+                                        dmgInfo:SetDamage(self.Animations["Melee_Hit"].Damage * 0.5)
+                                        bHitNPC = true
+                                        bHit = true
+                                        Flinch(self,v)
+                                    end 
+                                    if hitCount < 3 then
+                                        hitCount = hitCount + 1 
+                                    end
+                                end
+                                -- for some reason sounds all play at the same time for each infected unless you use a timer, probably has to do with prediction 
+                                -- I suck at coding, this is a quick and dirty way to make the sound play multiple times for multiple NPCs 
+                                if hitCount > 1 then
+                                    if self.Slot == 1 then
+                                        sound = Sound("MW_Melee.Flesh_Small")
+                                    else
+                                        sound = Sound("MW_Melee.Flesh_Medium")
+                                    end
+                                    -- subtract one for the one that plays by default 
+                                    timer.Simple( (hitCount - 1) * 0.02, function () self:DoSound(sound) end)
+                                    -- self:DoSound(Sound("MW_Melee.Flesh_Medium"))
+                                end
+                                if v:IsNPC() then 
+                                    v:TakeDamageInfo(dmgInfo,self:GetOwner())
                                 end
                             end
-                            -- for some reason sounds all play at the same time for each infected unless you use a timer, probably has to do with prediction 
-                            -- I suck at coding, this is a quick and dirty way to make the sound play multiple times for multiple NPCs 
-                            if hitCount > 1 then
-                                if self.Slot == 1 then
-                                    sound = Sound("MW_Melee.Flesh_Small")
-                                else
-                                    sound = Sound("MW_Melee.Flesh_Medium")
-                                end
-                                -- subtract one for the one that plays by default 
-                                timer.Simple( (hitCount - 1) * 0.02, function () self:DoSound(sound) end)
-                                -- self:DoSound(Sound("MW_Melee.Flesh_Medium"))
-                            end
-                            v:TakeDamageInfo(dmgInfo,self:GetOwner())
                         end
                     end
-
                     -- self:FireBullets({
                     --     Src = self:GetOwner():EyePos(),
                     --     Dir = self:GetOwner():EyeAngles():Forward(),
